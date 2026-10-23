@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Geoportal de Análise Espacial — Classes de NDVI em Extrema (MG) | 2016 vs 2026</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Estilos do Geoportal (Immersive Fullscreen Layout) -->
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <!-- ========================================================================
+       1. MODO TELA CHEIA (IMMERSIVE MAP 100vw x 100vh)
+       ======================================================================== -->
+  <div class="immersive-viewport">
+    <!-- Canvas do Mapa Leaflet em 100% da Tela -->
+    <div id="map" aria-label="Mapa Interativo de Análise Espacial de NDVI em Extrema (MG)"></div>
+
+    <!-- Indicador Visual de Carregamento (Loading State Spinner sobre o Mapa) -->
+    <div id="mapLoadingOverlay" class="map-loading-overlay" role="status" aria-live="polite">
+      <div class="spinner-ring"></div>
+      <div id="mapLoadingText" class="loading-text">Processando matriz espectral NDVI (10m)...</div>
+    </div>
+
+    <!-- ======================================================================
+         BARRA DE FERRAMENTAS FLUTUANTE COMPACTA (CANTO SUPERIOR ESQUERDO)
+         ====================================================================== -->
+    <header id="floatingToolbar" class="floating-toolbar-tl" aria-label="Barra de Ferramentas e Controles de Camadas">
+      <!-- Linha de Identificação Compacta + Botão de Recolher Barra -->
+      <div class="ft-header">
+        <div class="ft-brand">
+          <span class="ft-kicker">Sentinel-2 MSI L2A (10m) • SIRGAS 2000 / UTM 23S (EPSG:31983) • 244,48 km²</span>
+          <h1>Mudanças na Distribuição das Classes de NDVI em Extrema (MG): 2016 × 2026</h1>
+        </div>
+        <button type="button" id="btnCollapseToolbar" class="btn-icon-compact" title="Minimizar ou expandir barra de ferramentas" aria-label="Minimizar barra de ferramentas">
+          −
+        </button>
+      </div>
+
+      <!-- Corpo da Barra de Ferramentas Flutuante -->
+      <div id="ftBody" class="ft-body">
+        <!-- Linha 1: Mapa Base e Cenários Espectrais -->
+        <div class="ft-row">
+          <div class="toolbar-group">
+            <label for="selBasemap" class="toolbar-label">Base:</label>
+            <select id="selBasemap" class="toolbar-select" aria-label="Selecionar Mapa Base">
+              <option value="cartoDark" selected>CARTO Dark Matter</option>
+              <option value="esriDark">Esri Dark Gray</option>
+              <option value="cartoLight">CARTO Positron</option>
+              <option value="esriTopo">Esri Topográfico</option>
+              <option value="esriSat">Esri Satélite</option>
+            </select>
+          </div>
+
+          <div class="toolbar-divider"></div>
+
+          <div class="toolbar-group">
+            <span class="toolbar-label">Cenário:</span>
+            <button type="button" class="btn-mode" data-map-mode="2016">NDVI 2016</button>
+            <button type="button" class="btn-mode active" data-map-mode="2026">NDVI 2026</button>
+            <button type="button" class="btn-mode" data-map-mode="swipe">Cortina 2016 × 2026</button>
+          </div>
+        </div>
+
+        <!-- Faixa Compacta de Status da Camada Ativa -->
+        <div class="ft-status-strip">
+          <span id="opTag" class="op-tag">CENÁRIO ESPECTRAL 2026</span>
+          <span id="opTitle" class="op-title">Distribuição das 5 Classes de NDVI (2026)</span>
+          <span class="op-sep">—</span>
+          <span id="opDesc" class="op-desc">Clique em uma classe na legenda (canto inferior direito) para isolá-la ou clique em qualquer pixel de 10m.</span>
+        </div>
+
+        <!-- Controle da Cortina Deslizante (Swipe 2016 x 2026) acoplado à barra quando ativo -->
+        <div id="swipeControlBar" class="swipe-control-bar">
+          <span class="swipe-lbl-left">◀ NDVI 2016</span>
+          <input id="swipeRange" type="range" min="0" max="100" value="50" aria-label="Controle deslizante de comparação 2016 vs 2026" />
+          <span class="swipe-lbl-right">NDVI 2026 ▶</span>
+          <span id="swipePctLabel" class="swipe-pct">50%</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Aba Lateral Fixa na Borda Direita para Reabertura Rápida com 1 Clique -->
+    <button type="button" id="btnFloatingDrawerTab" class="floating-drawer-tab" title="Abrir Painel Descritivo &amp; Filtros Espaciais" aria-label="Abrir Painel Descritivo">
+      <span class="tab-arrow">◀</span>
+      <span class="tab-text">Síntese &amp; Filtros</span>
+    </button>
+
+    <!-- ======================================================================
+         MAPA DE LOCALIZAÇÃO RETRÁTIL (CANTO INFERIOR ESQUERDO)
+         ====================================================================== -->
+    <aside id="insetMapCard" class="inset-map-card" aria-label="Localização de Extrema em Minas Gerais">
+      <div id="insetHeaderToggle" class="widget-toggle-header" title="Clique para recolher ou expandir o mapa de localização">
+        <h5>📍 Localização de Extrema em Minas Gerais</h5>
+        <button type="button" id="btnCollapseInset" class="btn-collapse-widget" aria-label="Recolher mapa de localização">−</button>
+      </div>
+      <div class="inset-body">
+        <canvas id="insetCanvas" width="370" height="300" title="Clique para centralizar o mapa em Extrema (Minas Gerais)"></canvas>
+      </div>
+    </aside>
+
+    <!-- ======================================================================
+         4. LEGENDA FLUTUANTE COMPACTA E RETRÁTIL (CANTO INFERIOR DIREITO)
+         ====================================================================== -->
+    <aside id="mapLegendPanel" class="map-legend-panel" aria-label="Legenda de Classes de NDVI">
+      <div id="legendHeaderToggle" class="widget-toggle-header" title="Clique para expandir ou recolher a legenda das classes de NDVI">
+        <h4>🎨 Legenda — Classes de NDVI</h4>
+        <div class="legend-header-right">
+          <span class="legend-hint">Clique p/ isolar</span>
+          <button type="button" id="btnCollapseLegend" class="btn-collapse-widget" aria-label="Expandir ou recolher legenda">−</button>
+        </div>
+      </div>
+
+      <div class="legend-body">
+        <div class="legend-item" data-class-id="1">
+          <div class="legend-left">
+            <span class="swatch" style="background:#d61f1f;"></span>
+            <span><strong>Classe 1:</strong> NDVI muito baixo</span>
+          </div>
+          <span class="legend-range">-1,00 a 0,00</span>
+        </div>
+
+        <div class="legend-item" data-class-id="2">
+          <div class="legend-left">
+            <span class="swatch" style="background:#f07d0a;"></span>
+            <span><strong>Classe 2:</strong> NDVI baixo</span>
+          </div>
+          <span class="legend-range">0,00 a 0,20</span>
+        </div>
+
+        <div class="legend-item" data-class-id="3">
+          <div class="legend-left">
+            <span class="swatch" style="background:#f5ee09;"></span>
+            <span><strong>Classe 3:</strong> NDVI moderado</span>
+          </div>
+          <span class="legend-range">0,20 a 0,40</span>
+        </div>
+
+        <div class="legend-item" data-class-id="4">
+          <div class="legend-left">
+            <span class="swatch" style="background:#197a19;"></span>
+            <span><strong>Classe 4:</strong> NDVI alto</span>
+          </div>
+          <span class="legend-range">0,40 a 0,60</span>
+        </div>
+
+        <div class="legend-item" data-class-id="5">
+          <div class="legend-left">
+            <span class="swatch" style="background:#12491b;"></span>
+            <span><strong>Classe 5:</strong> NDVI muito alto</span>
+          </div>
+          <span class="legend-range">0,60 a 0,80</span>
+        </div>
+
+        <div class="legend-footer-boundary">
+          <span class="swatch-line" style="background:#991b1b;"></span>
+          <span>Limite municipal de Extrema (IBGE)</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ======================================================================
+         2. PAINEL COLAPSÁVEL / GAVETA LATERAL DESLIZANTE (OFF-CANVAS)
+         Sem backdrop/blur bloqueante — O mapa permanece 100% nítido e interativo
+         ====================================================================== -->
+    <aside id="offCanvasDrawer" class="offcanvas-drawer" aria-label="Gaveta de Síntese Comparativa e Textos Descritivos" aria-hidden="true">
+      <div class="drawer-header">
+        <div>
+          <span class="drawer-kicker">Painel Descritivo &amp; Filtros Espaciais</span>
+          <h3>Síntese Comparativa e Análises</h3>
+        </div>
+        <div class="drawer-header-buttons">
+          <button type="button" id="btnMinimizeDrawer" class="btn-minimize-drawer" title="Minimizar gaveta para a lateral direita" aria-label="Minimizar gaveta">
+            ⇥ Minimizar
+          </button>
+          <button type="button" id="btnCloseDrawer" class="btn-close-clean" title="Fechar gaveta lateral" aria-label="Fechar gaveta lateral">
+            ✕
+          </button>
+        </div>
+      </div>
+
+      <!-- Menus de Seleção Estilo Dropdown (Recortes de Análise Espectral & Ferramentas de Análise) -->
+      <div class="drawer-selectors-bar" aria-label="Seletores de Análise e Ferramentas">
+        <div class="drawer-select-group">
+          <label for="selDrawerAnalysis">Recortes de Análise Espectral:</label>
+          <select id="selDrawerAnalysis" class="spatial-select drawer-dropdown active-select">
+            <option value="">— Selecionar Recorte de Análise —</option>
+            <option value="overview" selected>📑 Síntese Temporal (2016 × 2026)</option>
+            <option value="ndvi-alto">📈 Maior Expansão — NDVI Alto (+35 km²)</option>
+            <option value="transicao">📉 Maior Retração — Moderado → Baixo</option>
+            <option value="proporcao-2026">📐 Classes Baixas (Classes 1 e 2) — 6,88% (2026)</option>
+            <option value="classes-altas-2026">🌿 Classes Altas (Classes 4 e 5) — 55,83% (2026)</option>
+          </select>
+        </div>
+
+        <div class="drawer-select-group">
+          <label for="selDrawerTools">Ferramentas de Análise:</label>
+          <select id="selDrawerTools" class="spatial-select drawer-dropdown">
+            <option value="" selected>— Selecionar Ferramenta (Gráficos, Tabelas...) —</option>
+            <option value="charts">📊 Gráficos Espectrais (2016 × 2026)</option>
+            <option value="tables">📋 Tabelas Quantitativas &amp; Matriz 5×5</option>
+            <option value="calculator">🧮 Calculadora Espectral de NDVI (2016 × 2026)</option>
+            <option value="carto_sheet">🗺️ Prancha Cartográfica Original</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Conteúdo em Acordeões Colapsáveis dentro da Gaveta -->
+      <div class="drawer-body">
+        <!-- MÓDULO 1: SÍNTESE COMPARATIVA -->
+        <div id="pane-overview" class="tab-pane active">
+          <details class="collapsible-card" open>
+            <summary class="collapsible-summary">
+              <h3>📑 Síntese Comparativa (2016 × 2026)</h3>
+              <span class="chevron-icon">▼</span>
+            </summary>
+            <div class="collapsible-content">
+              <p class="answer-synthesis">
+                Entre 2016 e 2026, observou-se redução de <strong>-35,95 km² (-28,29%)</strong> na classe de <strong>NDVI moderado (0,20 a 0,40)</strong> e aumento de <strong>+35,24 km² (+35,42%)</strong> na classe de <strong>NDVI alto (0,40 a 0,60)</strong>. Nas faixas inferiores do índice, houve expansão de <strong>+1,23 km² (+200,31%)</strong> em <strong>NDVI muito baixo (-1,00 a 0,00)</strong> e de <strong>+0,95 km² (+6,75%)</strong> em <strong>NDVI baixo (0,00 a 0,20)</strong>.
+              </p>
+              <p class="method-note">
+                *Nota metodológica: A interpretação dos valores espectrais deve considerar a comparabilidade entre as datas de aquisição, a sazonalidade e o pré-processamento das cenas Sentinel-2 MSI L2A.
+              </p>
+            </div>
+          </details>
+
+          <details class="collapsible-card" open>
+            <summary class="collapsible-summary">
+              <h3>📊 Indicadores-Chave de Variação (KPIs)</h3>
+              <span class="chevron-icon">▼</span>
+            </summary>
+            <div class="collapsible-content">
+              <div class="kpi-grid">
+                <div class="kpi-card">
+                  <span class="kpi-label">Maior Expansão (Classe 4)</span>
+                  <div class="kpi-value pos-text">+35,24 km²</div>
+                  <span class="kpi-sub">NDVI alto: +35,42% (99,50 → 134,74 km²)</span>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">Maior Retração (Classe 3)</span>
+                  <div class="kpi-value neg-text">-35,95 km²</div>
+                  <span class="kpi-sub">NDVI moderado: -28,29% (127,11 → 91,15 km²)</span>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">Classes 1 + 2 em 2026</span>
+                  <div class="kpi-value warn-text">16,83 km²</div>
+                  <span class="kpi-sub">6,88% do território municipal</span>
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <!-- MÓDULO 2: VARIAÇÃO ESPACIAL DA CLASSE "NDVI ALTO" -->
+        <div id="pane-ndvi-alto" class="tab-pane">
+          <details class="collapsible-card" open>
+            <summary class="collapsible-summary">
+              <h3>📑 Análise Descritiva — Classe "NDVI alto" (0,40 a 0,60)</h3>
+              <span class="chevron-icon">▼</span>
+            </summary>
+            <div class="collapsible-content">
+              <p class="answer-synthesis">
+                A classe de <strong>"NDVI alto" (0,40 a 0,60 — Classe 4)</strong> passou de <strong>99,504 km²</strong> (40,70% do município) em 2016 para <strong>134,743 km²</strong> (55,11% do município) em 2026, registrando uma <strong>expansão espacial líquida de +35,24 km²</strong> (exatos <strong>+35,2395 km²</strong>), equivalente a um crescimento relativo de <strong>+35,42%</strong> (+14,41 pontos percentuais sobre a área municipal).
+              </p>
+            </div>
+          </details>
+
+          <details class="collapsible-card" open>
+            <summary class="collapsible-summary">
+              <h3>🎯 Filtro de Isolamento Raster — Classe 4</h3>
+              <span class="chevron-icon">▼</span>
+            </summary>
+            <div class="collapsible-content geoproc-controls">
+              <div class="kpi-grid">
+                <div class="kpi-card">
+                  <span class="kpi-label">Área em 2016 (C4)</span>
+                  <div class="kpi-value">99,50 km²</div>
+                  <span class="kpi-sub">40,70% (995.039 px)</span>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">Área em 2026 (C4)</span>
+                  <div class="kpi-value pos-text">134,74 km²</div>
+                  <span class="kpi-sub">55,11% (1.347.434 px)</span>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">Diferença 2016–2026</span>
+                  <div class="kpi-value pos-text">+35,24 km²</div>
+                  <span class="kpi-sub">Variação: <strong>+35,42%</strong></span>
+                </div>
+              </div>
+
+              <button type="button" id="btnToggleClass4Isolate" class="btn-geoproc active-toggle">
+                <span>● Camada "NDVI alto" (0,40 a 0,60) Isolada no Mapa — Clique para Mostrar Todas</span>
+              </button>
+              <div class="btn-secondary-group">
+                <button type="button" class="btn-chip" data-class4-submode="2016_c4">Isolar NDVI Alto (2016)</button>
+                <button type="button" class="btn-chip active" data-class4-submode="2026_c4">Isolar NDVI Alto (2026)</button>
+                <button type="button" class="btn-chip" data-class4-submode="diff_c4">Dinâmica: Ganho × Permanência × Saída</button>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <!-- MÓDULO 3: MAIOR RETRAÇÃO (TRANSIÇÃO PARA CLASSES INFERIORES) -->
+        <div id="pane-transicao" class="tab-pane">
+          <details class="collapsible-card" open>
+            <summary class="collapsible-summary">
+              <h3>📑 Análise Descritiva — Transição para Classes Inferiores</h3>
+              <span class="chevron-icon">▼</span>
+            </summary>
+            <div class="collapsible-content">
+              <p class="answer-synthesis">
+                A transição descendente a partir de <strong>"NDVI moderado" (0,20 a 0,40)</strong> totaliza <strong>8,16 km²</strong> (sendo <strong>7,25 km²</strong> para <strong>"NDVI baixo"</strong> e <strong>0,91 km²</strong> para <strong>"NDVI muito baixo"</strong>). Geograficamente, <strong>95,6% (7,80 km²)</strong> dessas ocorrências distribuem-se ao longo do <strong>eixo Sudoeste–Centro–Norte</strong> do município, delimitadas entre as coordenadas UTM <code>360.880 m E – 368.620 m E</code> e <code>7.470.400 m N – 7.478.130 m N</code>, com maior adensamento no <strong>Setor Centro-Oeste (364.300 m E)</strong>, no <strong>Quadrante Sudoeste (361.400 m E)</strong> e no <strong>Setor Centro-Norte (367.900 m E)</strong>.
+              </p>
+            </div>
+          </details>
+
+          <details class="collapsible-card" open>
+            <summary class="collapsible-summary">
+              <h3>📊 Indicadores de Retração (Moderado → Baixo / Muito Baixo)</h3>
+              <span class="chevron-icon">▼</span>
+            </summary>
+            <div class="collapsible-content geoproc-controls">
+              <div class="kpi-grid">
+                <div class="kpi-card">
+                  <span class="kpi-label">Queda Total C3 → C1/C2</span>
+                  <div class="kpi-value warn-text">8,16 km²</div>
+                  <span class="kpi-sub">3,34% do município</span>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">Moderado → Baixo (3→2)</span>
+                  <div class="kpi-value" style="color:#fb923c;">7,25 km²</div>
+                  <span class="kpi-sub">88,9% da queda C3</span>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">Moderado → M. Baixo (3→1)</span>
+                  <div class="kpi-value neg-text">0,91 km²</div>
+                  <span class="kpi-sub">81.577 pixels (10m)</span>
+                </div>
+              </div>
+              <button type="button" id="btnToggleHotspots" class="btn-geoproc">
+                <span>📍 Exibir / Ocultar Círculos dos Núcleos de Transição no Mapa</span>
+              </button>
+            </div>
+          </details>
+        </div>
+
+        <!-- ABA DEDICADA: CALCULADORA HÍBRIDA DE NDVI (SOMA DE CLASSES + FLUXO DE TRANSIÇÃO) -->
+        <div id="pane-calculadora" class="tab-pane">
+          <!-- PARTE 1: COMPARAÇÃO E SOMA DE CLASSES ENTRE 2016 E 2026 -->
+          <details class="collapsible-card" open>
+            <summary class="collapsible-summary">
+              <h3>📊 Comparação e Soma de Classes (2016 × 2026)</h3>
+              <span class="chevron-icon">▼</span>
+            </summary>
+            <div class="collapsible-content geoproc-controls">
+              <p class="answer-synthesis" style="margin-bottom:6px;">
+                Selecione uma ou mais classes em <strong>2016</strong> e em <strong>2026</strong> de forma independente (ex.: <em>Classe 1 de 2016</em> × <em>Classe 5 de 2026</em>, ou soma de múltiplas classes) para comparar áreas (<code>km²</code>), participações (<code>%</code>) e diferença.
+              </p>
+
+              <div class="calc-dual-year-grid">
+                <!-- Coluna 2016 -->
+                <div class="calc-year-col">
+                  <div class="calc-year-header">
+                    <span>Cenário 2016</span>
+                    <button type="button" id="btnAll2016" class="calc-mini-link">Todas</button>
+                  </div>
+                  <div class="calc-class-checklist" id="calcChecklist2016">
+                    <button type="button" class="calc-class-toggle" data-year="2016" data-calc-cid="1" title="Classe 1 — NDVI muito baixo (-1,00 a 0,00): 0,61 km² em 2016">
+                      <span class="calc-check-box">✓</span>
+                      <span class="legend-swatch" style="background:#d61f1f;"></span>
+                      <span class="calc-class-name"><strong>Classe 1</strong> <small>(-1,0 a 0,0)</small></span>
+                    </button>
+                    <button type="button" class="calc-class-toggle" data-year="2016" data-calc-cid="2" title="Classe 2 — NDVI baixo (0,00 a 0,20): 14,04 km² em 2016">
+                      <span class="calc-check-box">✓</span>
+                      <span class="legend-swatch" style="background:#f07d0a;"></span>
+                      <span class="calc-class-name"><strong>Classe 2</strong> <small>(0,0 a 0,2)</small></span>
+                    </button>
+                    <button type="button" class="calc-class-toggle" data-year="2016" data-calc-cid="3" title="Classe 3 — NDVI moderado (0,20 a 0,40): 127,11 km² em 2016">
+                      <span class="calc-check-box">✓</span>
+                      <span class="legend-swatch" style="background:#f5ee09;"></span>
+                      <span class="calc-class-name"><strong>Classe 3</strong> <small>(0,2 a 0,4)</small></span>
+                    </button>
+                    <button type="button" class="calc-class-toggle active" data-year="2016" data-calc-cid="4" title="Classe 4 — NDVI alto (0,40 a 0,60): 99,50 km² em 2016">
+                      <span class="calc-check-box">✓</span>
+                      <span class="legend-swatch" style="background:#197a19;"></span>
+                      <span class="calc-class-name"><strong>Classe 4</strong> <small>(0,4 a 0,6)</small></span>
+                    </button>
+                    <button type="button" class="calc-class-toggle" data-year="2016" data-calc-cid="5" title="Classe 5 — NDVI muito alto (0,60 a 0,80): 3,21 km² em 2016">
+                      <span class="calc-check-box">✓</span>
+                      <span class="legend-swatch" style="background:#12491b;"></span>
+                      <span class="calc-class-name"><strong>Classe 5</strong> <small>(0,6 a 0,8)</small></span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Coluna 2026 -->
+                <div class="calc-year-col">
+                  <div class="calc-year-header">
+                    <span>Cenário 2026</span>
+                    <button type="button" id="btnAll2026" class="calc-mini-link">Todas</button>
+                  </div>
+                  <div class="calc-class-checklist" id="calcChecklist2026">
+                    <button type="button" class="calc-class-toggle" data-year="2026" data-calc-cid="1" title="Classe 1 — NDVI muito baixo (-1,00 a 0,00): 1,84 km² em 2026">
+                      <span class="calc-check-box">✓</span>
+                      <span class="legend-swatch" style="background:#d61f1f;"></span>
+                      <span class="calc-class-name"><strong>Classe 1</strong> <small>(-1,0 a 0,0)</small></span>
+                    </button>
+                    <button type="button" class="calc-class-toggle" data-year="2026" data-calc-cid="2" title="Classe 2 — NDVI baixo (0,00 a 0,20): 14,99 km² em 2026">
+                      <span class="calc-check-box">✓</span>
+                      <span class="legend-swatch" style="background:#f07d0a;"></span>
+                      <span class="calc-class-name"><strong>Classe 2</strong> <small>(0,0 a 0,2)</small></span>
+                    </button>
+                    <button type="button" class="calc-class-toggle" data-year="2026" data-calc-cid="3" title="Classe 3 — NDVI moderado (0,20 a 0,40): 91,15 km² em 2026">
+                      <span class="calc-check-box">✓</span>
+                      <span class="legend-swatch" style="background:#f5ee09;"></span>
+                      <span class="calc-class-name"><strong>Classe 3</strong> <small>(0,2 a 0,4)</small></span>
+                    </button>
+                    <button type="button" class="calc-class-toggle active" data-year="2026" data-calc-cid="4" title="Classe 4 — NDVI alto (0,40 a 0,60): 134,74 km² em 2026">
+                      <span class="calc-check-box">✓</span>
+                      <span class="legend-swatch" style="background:#197a19;"></span>
+                      <span class="calc-class-name"><strong>Classe 4</strong> <small>(0,4 a 0,6)</small></span>
+                    </button>
+                    <button type="button" class="calc-class-toggle" data-year="2026" data-calc-cid="5" title="Classe 5 — NDVI muito alto (0,60 a 0,80): 1,75 km² em 2026">
+                      <span class="calc-check-box">✓</span>
+                      <span class="legend-swatch" style="background:#12491b;"></span>
+                      <span class="calc-class-name"><strong>Classe 5</strong> <small>(0,6 a 0,8)</small></span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="kpi-grid">
+                <div class="kpi-card">
+                  <span id="calcSum2016Label" class="kpi-label">2016 (C4)</span>
+                  <div id="calcSum2016Area" class="kpi-value">99,50 km²</div>
+                  <span id="calcSum2016Pct" class="kpi-sub">40,70% do município</span>
+                </div>
+                <div class="kpi-card">
+                  <span id="calcSum2026Label" class="kpi-label">2026 (C4)</span>
+                  <div id="calcSum2026Area" class="kpi-value info-text">134,74 km²</div>
+                  <span id="calcSum2026Pct" class="kpi-sub">55,11% do município</span>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">Diferença (2026 − 2016)</span>
+                  <div id="calcSumDiffArea" class="kpi-value pos-text">+35,24 km²</div>
+                  <span id="calcSumDiffPct" class="kpi-sub">+35,42% (+14,41 p.p.)</span>
+                </div>
+              </div>
+
+              <div class="btn-secondary-group">
+                <button type="button" id="btnCalcShowMap2016" class="btn-chip">Destacar Seleção 2016</button>
+                <button type="button" id="btnCalcShowMap2026" class="btn-chip active">Destacar Seleção 2026</button>
+              </div>
+            </div>
+          </details>
+
+          <!-- PARTE 2: FLUXO DE TRANSIÇÃO ENTRE CENÁRIOS (2016 -> 2026) -->
+          <details class="collapsible-card" open>
+            <summary class="collapsible-summary">
+              <h3>🔄 Fluxo de Transição: <code>Origem (2016) → Destino (2026)</code></h3>
+              <span class="chevron-icon">▼</span>
+            </summary>
+            <div class="collapsible-content geoproc-controls">
+              <p class="answer-synthesis" style="margin-bottom:6px;">
+                Selecione uma combinação entre <strong>Origem (2016)</strong> e <strong>Destino (2026)</strong> para consultar a área transferida e sua representatividade em cada cenário.
+              </p>
+
+              <div class="select-row">
+                <div class="form-group">
+                  <label for="selAlgebraFrom">Origem (2016):</label>
+                  <select id="selAlgebraFrom" class="spatial-select">
+                    <option value="1">Classe 1 — NDVI muito baixo (-1,00 a 0,00)</option>
+                    <option value="2">Classe 2 — NDVI baixo (0,00 a 0,20)</option>
+                    <option value="3" selected>Classe 3 — NDVI moderado (0,20 a 0,40)</option>
+                    <option value="4">Classe 4 — NDVI alto (0,40 a 0,60)</option>
+                    <option value="5">Classe 5 — NDVI muito alto (0,60 a 0,80)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="selAlgebraTo">Destino (2026):</label>
+                  <select id="selAlgebraTo" class="spatial-select">
+                    <option value="1">Classe 1 — NDVI muito baixo (-1,00 a 0,00)</option>
+                    <option value="2">Classe 2 — NDVI baixo (0,00 a 0,20)</option>
+                    <option value="3">Classe 3 — NDVI moderado (0,20 a 0,40)</option>
+                    <option value="4" selected>Classe 4 — NDVI alto (0,40 a 0,60)</option>
+                    <option value="5">Classe 5 — NDVI muito alto (0,60 a 0,80)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div id="algebraDirectionBadge" class="calc-direction-badge pos">
+                ▲ Aumento de Índice (+1 classe espectral: Classe 3 → Classe 4)
+              </div>
+
+              <div class="kpi-grid">
+                <div class="kpi-card">
+                  <span class="kpi-label">Área da Transição</span>
+                  <div id="algebraAreaVal" class="kpi-value pos-text">45,95 km²</div>
+                  <span id="algebraPctVal" class="kpi-sub">18,80% do município</span>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">% sobre Origem (2016)</span>
+                  <div id="algebraOriginShareVal" class="kpi-value info-text">36,15%</div>
+                  <span id="algebraOriginShareSub" class="kpi-sub">da Classe 3 de 2016</span>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">% sobre Destino (2026)</span>
+                  <div id="algebraDestShareVal" class="kpi-value info-text">34,10%</div>
+                  <span id="algebraDestShareSub" class="kpi-sub">da Classe 4 de 2026</span>
+                </div>
+              </div>
+
+              <button type="button" id="btnShowTransitionOnMap" class="btn-geoproc">
+                <span>🗺️ Destacar Fluxo de Transição Selecionado no Mapa</span>
+              </button>
+            </div>
+          </details>
+        </div>
+
+        <!-- MÓDULO 4: PROPORÇÃO TERRITORIAL DAS CLASSES BAIXAS (CLASSES 1 E 2) EM 2026 -->
+        <div id="pane-proporcao-2026" class="tab-pane">
+          <details class="collapsible-card" open>
+            <summary class="collapsible-summary">
+              <h3>📑 Análise Descritiva — Classes Baixas (Classes 1 e 2) em 2026</h3>
+              <span class="chevron-icon">▼</span>
+            </summary>
+            <div class="collapsible-content">
+              <p class="answer-synthesis">
+                As <strong>Classes Baixas referem-se às Classes 1 ("NDVI muito baixo": -1,00 a 0,00) e 2 ("NDVI baixo": 0,00 a 0,20)</strong>. No cenário de 2026, essas duas classes inferiores do índice (Classes 1 e 2) somam <strong>16,834 km²</strong> (<strong>16,83 km²</strong>), o que corresponde a <strong>6,88%</strong> (ou <strong>6,89%</strong> considerando a soma direta de <code>0,75% + 6,13%</code> da tabela oficial) da área total do município de Extrema (<strong>244,483 km²</strong> mapeados no raster / <strong>244,575 km²</strong> malha IBGE). Individualmente, a <strong>Classe 1 — NDVI muito baixo (-1,00 a 0,00)</strong> ocupa <strong>1,843 km² (0,75%)</strong> e a <strong>Classe 2 — NDVI baixo (0,00 a 0,20)</strong> ocupa <strong>14,992 km² (6,13%)</strong>, frente aos <strong>93,12% (227,65 km²)</strong> ocupados pelas demais classes (Classes 3, 4 e 5).
+              </p>
+            </div>
+          </details>
+
+          <details class="collapsible-card" open>
+            <summary class="collapsible-summary">
+              <h3>🎯 Destaque Espacial — Classes Baixas (Classes 1 e 2)</h3>
+              <span class="chevron-icon">▼</span>
+            </summary>
+            <div class="collapsible-content">
+              <div class="kpi-grid" style="margin-bottom:10px;">
+                <div class="kpi-card">
+                  <span class="kpi-label">Classe 1 — Muito Baixo</span>
+                  <div class="kpi-value neg-text">1,84 km²</div>
+                  <span class="kpi-sub">0,75% (18.427 px)</span>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">Classe 2 — Baixo</span>
+                  <div class="kpi-value warn-text">14,99 km²</div>
+                  <span class="kpi-sub">6,13% (149.916 px)</span>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">Soma (Classes 1 + 2)</span>
+                  <div class="kpi-value" style="color:#f97316;">16,83 km²</div>
+                  <span class="kpi-sub"><strong>6,88%</strong> do território</span>
+                </div>
+              </div>
+
+              <div class="btn-secondary-group">
+                <button type="button" id="btnHighlightPropBoth" class="btn-chip active">Destacar Soma (Classes 1 + 2)</button>
+                <button type="button" id="btnHighlightPropC1" class="btn-chip">Isolar Classe 1 (-1,00 a 0,00)</button>
+                <button type="button" id="btnHighlightPropC2" class="btn-chip">Isolar Classe 2 (0,00 a 0,20)</button>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <!-- MÓDULO 5: PROPORÇÃO TERRITORIAL DAS CLASSES ALTAS (CLASSES 4 E 5) EM 2026 -->
+        <div id="pane-classes-altas-2026" class="tab-pane">
+          <details class="collapsible-card" open>
+            <summary class="collapsible-summary">
+              <h3>📑 Análise Descritiva — Classes Altas (Classes 4 e 5) em 2026</h3>
+              <span class="chevron-icon">▼</span>
+            </summary>
+            <div class="collapsible-content">
+              <p class="answer-synthesis">
+                As <strong>Classes Altas referem-se às Classes 4 ("NDVI alto": 0,40 a 0,60) e 5 ("NDVI muito alto": 0,60 a 0,80)</strong>. No cenário de 2026, essas duas classes superiores do índice (Classes 4 e 5) somam <strong>136,495 km²</strong> (<strong>136,50 km²</strong>), o que corresponde a <strong>55,83%</strong> (soma de <code>55,11% + 0,72%</code>) da área total do município de Extrema (<strong>244,483 km²</strong> mapeados no raster / <strong>244,575 km²</strong> malha IBGE). Individualmente, a <strong>Classe 4 — NDVI alto (0,40 a 0,60)</strong> ocupa <strong>134,743 km² (55,11%)</strong> e a <strong>Classe 5 — NDVI muito alto (0,60 a 0,80)</strong> ocupa <strong>1,752 km² (0,72%)</strong>, frente aos <strong>44,17% (107,99 km²)</strong> ocupados pelas demais classes (Classes 1, 2 e 3). Em relação a 2016 (<strong>102,718 km²</strong> ou <strong>42,01%</strong>), o conjunto das Classes 4 e 5 apresentou expansão líquida de <strong>+33,777 km² (+32,88%)</strong>.
+              </p>
+            </div>
+          </details>
+
+          <details class="collapsible-card" open>
+            <summary class="collapsible-summary">
+              <h3>🎯 Destaque Espacial — Classes Altas (Classes 4 e 5)</h3>
+              <span class="chevron-icon">▼</span>
+            </summary>
+            <div class="collapsible-content">
+              <div class="kpi-grid" style="margin-bottom:10px;">
+                <div class="kpi-card">
+                  <span class="kpi-label">Classe 4 — NDVI Alto</span>
+                  <div class="kpi-value pos-text">134,74 km²</div>
+                  <span class="kpi-sub">55,11% (1.347.434 px)</span>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">Classe 5 — Muito Alto</span>
+                  <div class="kpi-value" style="color:#4ade80;">1,75 km²</div>
+                  <span class="kpi-sub">0,72% (17.517 px)</span>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">Soma (Classes 4 + 5)</span>
+                  <div class="kpi-value pos-text">136,50 km²</div>
+                  <span class="kpi-sub"><strong>55,83%</strong> do território</span>
+                </div>
+              </div>
+
+              <div class="btn-secondary-group">
+                <button type="button" id="btnHighlightHighBoth" class="btn-chip active">Destacar Soma (Classes 4 + 5)</button>
+                <button type="button" id="btnHighlightHighC4" class="btn-chip">Isolar Classe 4 (0,40 a 0,60)</button>
+                <button type="button" id="btnHighlightHighC5" class="btn-chip">Isolar Classe 5 (0,60 a 0,80)</button>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ======================================================================
+         BARRA DE STATUS FLUTUANTE DE COORDENADAS NO RODAPÉ
+         ====================================================================== -->
+    <footer class="status-footer">
+      <div class="footer-coords">
+        <span id="utmCoordsDisplay"><strong>UTM 23S:</strong> 369.000 m E, 7.476.500 m N</span>
+        <span class="footer-sep">|</span>
+        <span id="pixelProbeDisplay">Passe o cursor sobre o mapa para inspecionar o índice NDVI (2016 → 2026)</span>
+      </div>
+      <div class="footer-credits">
+        <span>Sentinel-2 MSI L2A • Malha IBGE 2025 • Elaboração: Maysa Nogueira (Ago/2026)</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ========================================================================
+       3. JANELA MODAL CENTRALIZADA PARA GRÁFICOS E TABELAS ANALÍTICAS
+       ======================================================================== -->
+  <div id="analyticsModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Gráficos e Tabelas de Análise Espectral">
+    <div class="modal-window modal-analytics-window">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-kicker">Análise Multitemporal do NDVI • Extrema (MG) | 2016 × 2026</span>
+          <h3 id="analyticsModalTitle">Painel de Gráficos e Tabelas Espectrais</h3>
+        </div>
+        <div class="modal-header-actions">
+          <div class="modal-tab-switcher">
+            <button type="button" class="btn-modal-tab active" data-modal-view="charts">📊 Gráficos Espectrais</button>
+            <button type="button" class="btn-modal-tab" data-modal-view="tables">📋 Tabelas &amp; Matriz 5×5</button>
+          </div>
+          <button id="btnCloseAnalyticsModal" type="button" class="btn-close-clean">✕ Fechar</button>
+        </div>
+      </div>
+
+      <div class="modal-body modal-analytics-body">
+        <!-- VISÃO 1 DO MODAL: GRÁFICOS ESPECTRAIS -->
+        <div id="modalViewCharts" class="modal-view-section active">
+          <div class="modal-charts-grid">
+            <!-- Gráfico 1: Barras 2016 vs 2026 -->
+            <div class="modal-card modal-card-wide">
+              <div class="modal-card-header">
+                <h4>📈 Área por Classe de NDVI em Extrema (MG) — Comparativo 2016 × 2026 (km²)</h4>
+                <span class="badge-subtle">Fonte: Tabela_Extrema_analise.gpkg • Total: 244,483 km²</span>
+              </div>
+              <div class="chart-box-modal">
+                <canvas id="chartOverviewBars"></canvas>
+              </div>
+            </div>
+
+            <!-- Gráfico 2: Evolução da Classe 4 (NDVI Alto) -->
+            <div class="modal-card">
+              <div class="modal-card-header">
+                <h4>📊 Balanço Espectral da Classe 4 — "NDVI alto" (0,40 a 0,60)</h4>
+                <span class="badge-subtle">Expansão Líquida: +35,24 km² (+35,42%)</span>
+              </div>
+              <div class="chart-box-modal">
+                <canvas id="chartClass4Bars"></canvas>
+              </div>
+            </div>
+
+            <!-- Gráfico 3: Rosca (Donut Chart) Proporção 2026 -->
+            <div class="modal-card">
+              <div class="modal-card-header">
+                <h4>🍩 Proporção Territorial por Classe de NDVI em 2026</h4>
+                <span class="badge-subtle">Classes 1 + 2 = 16,83 km² (6,88%)</span>
+              </div>
+              <div class="chart-box-modal">
+                <canvas id="chartPropDonut"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- VISÃO 2 DO MODAL: TABELAS E MATRIZ DE TRANSIÇÃO 5x5 -->
+        <div id="modalViewTables" class="modal-view-section">
+          <div class="modal-tables-stack">
+            <!-- Tabela 1: Principais Mudanças por Classe Espectral -->
+            <div class="modal-card">
+              <div class="modal-card-header">
+                <h4>📋 Tabela 1 — Principais Mudanças por Classe Espectral (2016 × 2026)</h4>
+                <span class="badge-subtle">SIRGAS 2000 / UTM 23S • Área Mapeada: 244,483 km²</span>
+              </div>
+              <div class="data-table-wrap">
+                <table class="spatial-table">
+                  <thead>
+                    <tr>
+                      <th>Classe de NDVI (Intervalo Espectral)</th>
+                      <th class="num">2016 (km²)</th>
+                      <th class="num">2016 (%)</th>
+                      <th class="num">2026 (km²)</th>
+                      <th class="num">2026 (%)</th>
+                      <th class="num">Mudança (km²)</th>
+                      <th class="num">Variação (%)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><span class="table-swatch" style="background:#d61f1f;"></span><strong>Classe 1 — NDVI muito baixo</strong> (-1,00 a 0,00)</td>
+                      <td class="num">0,61</td>
+                      <td class="num">0,25%</td>
+                      <td class="num">1,84</td>
+                      <td class="num">0,75%</td>
+                      <td class="num warn-text">+1,23</td>
+                      <td class="num warn-text">+200,31%</td>
+                    </tr>
+                    <tr>
+                      <td><span class="table-swatch" style="background:#f07d0a;"></span><strong>Classe 2 — NDVI baixo</strong> (0,00 a 0,20)</td>
+                      <td class="num">14,04</td>
+                      <td class="num">5,74%</td>
+                      <td class="num">14,99</td>
+                      <td class="num">6,13%</td>
+                      <td class="num warn-text">+0,95</td>
+                      <td class="num warn-text">+6,75%</td>
+                    </tr>
+                    <tr>
+                      <td><span class="table-swatch" style="background:#f5ee09;"></span><strong>Classe 3 — NDVI moderado</strong> (0,20 a 0,40)</td>
+                      <td class="num">127,11</td>
+                      <td class="num">51,99%</td>
+                      <td class="num">91,15</td>
+                      <td class="num">37,28%</td>
+                      <td class="num neg-text"><strong>-35,95</strong></td>
+                      <td class="num neg-text"><strong>-28,29%</strong></td>
+                    </tr>
+                    <tr>
+                      <td><span class="table-swatch" style="background:#197a19;"></span><strong>Classe 4 — NDVI alto</strong> (0,40 a 0,60)</td>
+                      <td class="num">99,50</td>
+                      <td class="num">40,70%</td>
+                      <td class="num">134,74</td>
+                      <td class="num">55,11%</td>
+                      <td class="num pos-text"><strong>+35,24</strong></td>
+                      <td class="num pos-text"><strong>+35,42%</strong></td>
+                    </tr>
+                    <tr>
+                      <td><span class="table-swatch" style="background:#12491b;"></span><strong>Classe 5 — NDVI muito alto</strong> (0,60 a 0,80)</td>
+                      <td class="num">3,21</td>
+                      <td class="num">1,31%</td>
+                      <td class="num">1,75</td>
+                      <td class="num">0,72%</td>
+                      <td class="num neg-text">-1,46</td>
+                      <td class="num neg-text">-45,50%</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Tabela 2: Núcleos Geográficos de Concentração (Hotspots UTM) e Matriz 5x5 lado a lado -->
+            <div class="modal-tables-two-col">
+              <div class="modal-card">
+                <div class="modal-card-header">
+                  <h4>📍 Tabela 2 — Núcleos Geográficos de Redução (Clique p/ Zoom no Mapa)</h4>
+                  <span class="badge-subtle">Transição Classe 3 → Classes 1 e 2</span>
+                </div>
+                <div class="data-table-wrap">
+                  <table class="spatial-table">
+                    <thead>
+                      <tr>
+                        <th>Setor Geográfico e Coordenada Central UTM</th>
+                        <th class="num">3 → 2 (km²)</th>
+                        <th class="num">3 → 1 (km²)</th>
+                        <th class="num">Total Redução</th>
+                      </tr>
+                    </thead>
+                    <tbody id="hotspotsTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="modal-card">
+                <div class="modal-card-header">
+                  <h4>🔢 Tabela 3 — Matriz Completa de Transição 2016 × 2026 [km²]</h4>
+                  <span class="badge-subtle">Cruzamento Matricial (Pixels de 10m)</span>
+                </div>
+                <div class="data-table-wrap">
+                  <table class="spatial-table">
+                    <thead>
+                      <tr>
+                        <th>2016 \ 2026</th>
+                        <th class="num">C1 (M. Baixo)</th>
+                        <th class="num">C2 (Baixo)</th>
+                        <th class="num">C3 (Moderado)</th>
+                        <th class="num">C4 (Alto)</th>
+                        <th class="num">C5 (M. Alto)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="transitionMatrixBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tabela 3 e 4: Balanço da Classe 4 e Proporção das Classes Inferiores -->
+            <div class="modal-tables-two-col">
+              <div class="modal-card">
+                <div class="modal-card-header">
+                  <h4>🎯 Tabela 4 — Componentes da Dinâmica da Classe 4 ("NDVI alto")</h4>
+                  <span class="badge-subtle">Intervalo: 0,40 a 0,60</span>
+                </div>
+                <div class="data-table-wrap">
+                  <table class="spatial-table">
+                    <thead>
+                      <tr>
+                        <th>Componente da Dinâmica Espacial (2016 → 2026)</th>
+                        <th class="num">Área (km²)</th>
+                        <th class="num">Participação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>Permanência em "NDVI alto"</strong> (Classe 4 → Classe 4)</td>
+                        <td class="num">89,40 km²</td>
+                        <td class="num">65,0% da C4 (2026)</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Entrada a partir de "NDVI moderado"</strong> (Classe 3 → Classe 4)</td>
+                        <td class="num pos-text">+45,95 km²</td>
+                        <td class="num">33,4% da C4 (2026)</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Entrada a partir de "NDVI muito alto"</strong> (Classe 5 → Classe 4)</td>
+                        <td class="num info-text">+1,17 km²</td>
+                        <td class="num">0,9% da C4 (2026)</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Entrada a partir de "NDVI baixo / muito baixo"</strong> (C1/C2 → C4)</td>
+                        <td class="num pos-text">+1,07 km²</td>
+                        <td class="num">0,8% da C4 (2026)</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Saída de "NDVI alto" para outras classes</strong> (C4 → C1, C2, C3, C5)</td>
+                        <td class="num neg-text">-7,30 km²</td>
+                        <td class="num">6,46 km² p/ Classe 3</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="modal-card">
+                <div class="modal-card-header">
+                  <h4>📐 Tabela 5 — Proporção Territorial das Classes Inferiores (C1 + C2)</h4>
+                  <span class="badge-subtle">Comparativo 2016 × 2026</span>
+                </div>
+                <div class="data-table-wrap">
+                  <table class="spatial-table">
+                    <thead>
+                      <tr>
+                        <th>Indicador Territorial</th>
+                        <th class="num">Cenário 2016</th>
+                        <th class="num">Cenário 2026</th>
+                        <th class="num">Diferença</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>Classe 1 — NDVI muito baixo</strong> (-1,00 a 0,00)</td>
+                        <td class="num">0,614 km² (0,25%)</td>
+                        <td class="num">1,843 km² (0,75%)</td>
+                        <td class="num neg-text">+1,229 km² (+200,31%)</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Classe 2 — NDVI baixo</strong> (0,00 a 0,20)</td>
+                        <td class="num">14,044 km² (5,74%)</td>
+                        <td class="num">14,992 km² (6,13%)</td>
+                        <td class="num warn-text">+0,947 km² (+6,75%)</td>
+                      </tr>
+                      <tr style="background:rgba(249,115,22,0.12);">
+                        <td><strong>Soma das Classes 1 + 2 (Muito Baixo + Baixo)</strong></td>
+                        <td class="num"><strong>14,658 km² (5,99%)</strong></td>
+                        <td class="num"><strong>16,834 km² (6,88%)</strong></td>
+                        <td class="num warn-text"><strong>+2,177 km² (+14,85%)</strong></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Demais Classes (Classes 3 + 4 + 5: 0,20 a 0,80)</strong></td>
+                        <td class="num">229,825 km² (94,01%)</td>
+                        <td class="num">227,649 km² (93,12%)</td>
+                        <td class="num">-2,177 km² (-0,95%)</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Área Total Mapeada / Limite Municipal IBGE</strong></td>
+                        <td class="num">244,483 km² (100%)</td>
+                        <td class="num">244,483 km² (100%)</td>
+                        <td class="num">IBGE: 244,575 km²</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="modal-card">
+                <div class="modal-card-header">
+                  <h4>🌿 Tabela 6 — Proporção Territorial das Classes Superiores (C4 + C5)</h4>
+                  <span class="badge-subtle">Comparativo 2016 × 2026</span>
+                </div>
+                <div class="data-table-wrap">
+                  <table class="spatial-table">
+                    <thead>
+                      <tr>
+                        <th>Indicador Territorial</th>
+                        <th class="num">Cenário 2016</th>
+                        <th class="num">Cenário 2026</th>
+                        <th class="num">Diferença</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>Classe 4 — NDVI alto</strong> (0,40 a 0,60)</td>
+                        <td class="num">99,504 km² (40,70%)</td>
+                        <td class="num">134,743 km² (55,11%)</td>
+                        <td class="num pos-text">+35,240 km² (+35,42%)</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Classe 5 — NDVI muito alto</strong> (0,60 a 0,80)</td>
+                        <td class="num">3,214 km² (1,31%)</td>
+                        <td class="num">1,752 km² (0,72%)</td>
+                        <td class="num neg-text">-1,463 km² (-45,50%)</td>
+                      </tr>
+                      <tr style="background:rgba(16,185,129,0.12);">
+                        <td><strong>Soma das Classes 4 + 5 (Alto + Muito Alto)</strong></td>
+                        <td class="num"><strong>102,718 km² (42,01%)</strong></td>
+                        <td class="num"><strong>136,495 km² (55,83%)</strong></td>
+                        <td class="num pos-text"><strong>+33,777 km² (+32,88%)</strong></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Demais Classes (Classes 1 + 2 + 3: -1,00 a 0,40)</strong></td>
+                        <td class="num">141,765 km² (57,99%)</td>
+                        <td class="num">107,988 km² (44,17%)</td>
+                        <td class="num">-33,777 km² (-23,83%)</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Área Total Mapeada / Limite Municipal IBGE</strong></td>
+                        <td class="num">244,483 km² (100%)</td>
+                        <td class="num">244,483 km² (100%)</td>
+                        <td class="num">IBGE: 244,575 km²</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PARA VISUALIZAÇÃO DA PRANCHA ORIGINAL (Analise_Multitemporal_do_NDVI_Extrema_MG.png) -->
+  <div id="cartoModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Prancha Cartográfica Original">
+    <div class="modal-window">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-kicker">Documento Cartográfico de Referência</span>
+          <h3>Prancha Cartográfica — Análise Multitemporal do NDVI em Extrema (MG)</h3>
+        </div>
+        <button id="btnCloseCartoSheet" type="button" class="btn-close-clean">✕ Fechar</button>
+      </div>
+      <div class="modal-body">
+        <img src="Analise_Multitemporal_do_NDVI_Extrema_MG.png" alt="Mudanças na distribuição das classes de NDVI em Extrema (MG): comparação entre 2016 e 2026" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts Externos (Leaflet & Chart.js) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <!-- Cubo de Dados Georreferenciados + Motor Espacial + App -->
+  <script src="data/geoportal_data.js"></script>
+  <script src="js/spatial-engine.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,1672 @@
+:root {
+  --bg-primary: #0b111e;
+  --bg-secondary: #111a2e;
+  --bg-panel: #152036;
+  --bg-glass: rgba(13, 21, 38, 0.90);
+  --bg-glass-strong: rgba(11, 17, 30, 0.95);
+  --bg-card: #1b2842;
+  --bg-card-hover: #223354;
+  --border-subtle: rgba(148, 163, 184, 0.18);
+  --border-active: rgba(56, 189, 248, 0.55);
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --accent-cyan: #0ea5e9;
+  --accent-teal: #0ea39c;
+  --accent-blue: #1d3c96;
+  --accent-amber: #f59e0b;
+  --accent-danger: #ef4444;
+  --accent-emerald: #10b981;
+
+  /* Paleta Oficial do NDVI Extrema */
+  --ndvi-c1: #d61f1f; /* NDVI muito baixo: -1,00 a 0,00 */
+  --ndvi-c2: #f07d0a; /* NDVI baixo: 0,00 a 0,20 */
+  --ndvi-c3: #f5ee09; /* NDVI moderado: 0,20 a 0,40 */
+  --ndvi-c4: #197a19; /* NDVI alto: 0,40 a 0,60 */
+  --ndvi-c5: #12491b; /* NDVI muito alto: 0,60 a 0,80 */
+  --limite-extrema: #8b1e1e;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --shadow-lg: 0 12px 32px -4px rgba(0, 0, 0, 0.62);
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================================
+   1. MODO TELA CHEIA COM REDIMENSIONAMENTO DINÂMICO (SEM BLOQUEIO DO MAPA)
+   ============================================================================ */
+:root {
+  --drawer-width: min(400px, 30vw);
+}
+
+.immersive-viewport {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#map {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+  background: #0b111e;
+  transition: width 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Quando a gaveta lateral abre, o mapa redimensiona o espaço livre sem sobreposição ou desfoque */
+body.drawer-open #map {
+  width: calc(100vw - var(--drawer-width));
+}
+
+/* Posicionamento limpo dos controles nativos do Leaflet (sem colidir com barras flutuantes) */
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 400 !important;
+}
+
+.leaflet-bottom.leaflet-left {
+  bottom: 34px !important;
+  left: 10px !important;
+}
+
+.leaflet-bottom.leaflet-right {
+  bottom: 28px !important;
+}
+
+.leaflet-control-zoom {
+  border: 1px solid var(--border-subtle) !important;
+  box-shadow: var(--shadow-lg) !important;
+  border-radius: var(--radius-sm) !important;
+  overflow: hidden;
+}
+
+.leaflet-control-zoom a {
+  background: var(--bg-glass-strong) !important;
+  color: var(--text-primary) !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+  width: 30px !important;
+  height: 30px !important;
+  line-height: 30px !important;
+  font-size: 15px !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: var(--bg-card-hover) !important;
+  color: #38bdf8 !important;
+}
+
+.leaflet-control-zoom a.leaflet-ctrl-tool {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+}
+
+.leaflet-control-zoom a.leaflet-ctrl-tool.active {
+  background: rgba(14, 165, 233, 0.24) !important;
+  color: #38bdf8 !important;
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.55);
+}
+
+.leaflet-control-attribution {
+  background: rgba(8, 13, 23, 0.75) !important;
+  color: var(--text-muted) !important;
+  font-size: 10px !important;
+  border-radius: 4px 0 0 0;
+}
+
+.leaflet-control-attribution a {
+  color: #38bdf8 !important;
+}
+
+/* ============================================================================
+   INDICADOR VISUAL DE CARREGAMENTO COMPACTO (SEM ESCURECER OU BORRAR O MAPA)
+   ============================================================================ */
+.map-loading-overlay {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1500;
+  background: var(--bg-glass-strong);
+  border: 1px solid var(--border-active);
+  border-radius: 999px;
+  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease;
+}
+
+.map-loading-overlay.active {
+  opacity: 1;
+}
+
+.spinner-ring {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(56, 189, 248, 0.25);
+  border-top-color: #38bdf8;
+  border-right-color: #0ea39c;
+  border-radius: 50%;
+  animation: geoportal-spin 0.7s linear infinite;
+}
+
+.loading-text {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #e2e8f0;
+  white-space: nowrap;
+}
+
+@keyframes geoportal-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================================================
+   BARRA DE FERRAMENTAS FLUTUANTE COMPACTA (CANTO SUPERIOR ESQUERDO)
+   ============================================================================ */
+.floating-toolbar-tl {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 650;
+  width: min(740px, calc(100vw - 175px));
+  background: var(--bg-glass-strong);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  transition: width 0.25s ease, max-width 0.25s ease, box-shadow 0.2s ease;
+}
+
+body.drawer-open .floating-toolbar-tl {
+  width: min(720px, calc(100vw - var(--drawer-width) - 24px));
+}
+
+.floating-toolbar-tl.collapsed {
+  width: auto;
+  max-width: min(520px, calc(100vw - 175px));
+}
+
+.floating-toolbar-tl.collapsed .ft-body {
+  display: none;
+}
+
+.ft-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: linear-gradient(90deg, rgba(13, 22, 39, 0.95) 0%, rgba(20, 34, 59, 0.92) 100%);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.floating-toolbar-tl.collapsed .ft-header {
+  border-bottom: none;
+}
+
+.ft-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-left: 9px;
+  border-left: 3px solid var(--accent-teal);
+  min-width: 0;
+}
+
+.ft-kicker {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #38bdf8;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ft-brand h1 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-icon-compact {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.btn-icon-compact:hover {
+  background: rgba(14, 165, 233, 0.25);
+  color: #fff;
+  border-color: var(--accent-cyan);
+}
+
+.ft-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px 10px;
+}
+
+.ft-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border-subtle);
+  margin: 0 2px;
+}
+
+.toolbar-label {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-right: 2px;
+  font-weight: 600;
+}
+
+.toolbar-select {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+}
+
+.toolbar-select:focus {
+  border-color: var(--accent-cyan);
+}
+
+.btn-mode {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  color: var(--text-secondary);
+  padding: 4px 9px;
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-mode:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.btn-mode.active {
+  background: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  color: #07101d;
+  font-weight: 700;
+  box-shadow: 0 0 10px rgba(14, 165, 233, 0.4);
+}
+
+/* Linha de Botões de Acesso Rápido (Gaveta e Modais) */
+.ft-actions-row {
+  padding-top: 5px;
+  border-top: 1px solid var(--border-subtle);
+  gap: 6px;
+}
+
+.btn-quick-action {
+  background: rgba(14, 165, 233, 0.13);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #7dd3fc;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-quick-action:hover {
+  background: rgba(14, 165, 233, 0.28);
+  color: #fff;
+  border-color: #38bdf8;
+  transform: translateY(-1px);
+}
+
+.btn-drawer-trigger {
+  background: linear-gradient(135deg, rgba(14, 163, 156, 0.26) 0%, rgba(14, 165, 233, 0.24) 100%);
+  border-color: rgba(45, 212, 191, 0.5);
+  color: #5eead4;
+}
+
+.btn-drawer-trigger:hover {
+  background: linear-gradient(135deg, rgba(14, 163, 156, 0.42) 0%, rgba(14, 165, 233, 0.38) 100%);
+  color: #fff;
+}
+
+/* Faixa Compacta de Status acoplada à Barra Flutuante */
+.ft-status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  background: rgba(9, 14, 25, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-left: 3px solid var(--accent-cyan);
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.ft-status-strip .op-tag {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #38bdf8;
+  font-weight: 700;
+  background: rgba(14, 165, 233, 0.16);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.ft-status-strip .op-title {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ft-status-strip .op-sep {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.ft-status-strip .op-desc {
+  color: var(--text-muted);
+}
+
+/* Controle Deslizante da Cortina (Swipe 2016 x 2026) */
+.swipe-control-bar {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid var(--border-active);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  margin-top: 2px;
+}
+
+.swipe-control-bar.visible {
+  display: flex;
+}
+
+.swipe-lbl-left {
+  font-size: 11px;
+  font-weight: 700;
+  color: #60a5fa;
+  white-space: nowrap;
+}
+
+.swipe-lbl-right {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2dd4bf;
+  white-space: nowrap;
+}
+
+#swipeRange {
+  flex: 1;
+  max-width: 220px;
+  cursor: pointer;
+}
+
+.swipe-pct {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #cbd5e1;
+  min-width: 34px;
+  text-align: right;
+}
+
+/* Aba Lateral de Reabertura Rápida (Visível na borda direita quando a gaveta está recolhida) */
+.floating-drawer-tab {
+  position: fixed;
+  top: 14px;
+  right: 0;
+  z-index: 650;
+  background: var(--bg-glass-strong);
+  border: 1px solid var(--border-active);
+  border-right: none;
+  color: #38bdf8;
+  padding: 9px 14px;
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-lg);
+  transition: transform 0.25s ease, background 0.18s ease, color 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.floating-drawer-tab:hover {
+  background: var(--accent-cyan);
+  color: #07101d;
+}
+
+body.drawer-open .floating-drawer-tab {
+  transform: translateX(110%);
+  pointer-events: none;
+}
+
+/* ============================================================================
+   4. LEGENDA FLUTUANTE COMPACTA E RETRÁTIL (CANTO INFERIOR DIREITO)
+   ============================================================================ */
+.map-legend-panel {
+  position: fixed;
+  bottom: 36px;
+  right: 12px;
+  z-index: 600;
+  width: 265px;
+  background: var(--bg-glass-strong);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
+  box-shadow: var(--shadow-lg);
+  transition: right 0.28s cubic-bezier(0.22, 1, 0.36, 1), width 0.2s ease, padding 0.2s ease;
+}
+
+/* Desloca a legenda suavemente para a esquerda quando a gaveta abre, sem jamais cobri-la */
+body.drawer-open .map-legend-panel {
+  right: calc(var(--drawer-width) + 12px);
+}
+
+.map-legend-panel.collapsed {
+  width: 225px;
+  padding: 8px 11px;
+}
+
+.map-legend-panel.collapsed .legend-body,
+.map-legend-panel.collapsed .legend-hint {
+  display: none;
+}
+
+.map-legend-panel.collapsed .widget-toggle-header {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.widget-toggle-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-subtle);
+  cursor: pointer;
+  user-select: none;
+}
+
+.widget-toggle-header h4,
+.widget-toggle-header h5 {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+}
+
+.legend-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.btn-collapse-widget {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-collapse-widget:hover {
+  background: rgba(14, 165, 233, 0.28);
+  color: #fff;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.12s;
+  font-size: 11.5px;
+}
+
+.legend-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.legend-item.isolated {
+  background: rgba(14, 165, 233, 0.22);
+  outline: 1px solid var(--accent-cyan);
+}
+
+.legend-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  flex-shrink: 0;
+}
+
+.swatch-line {
+  width: 15px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.legend-range {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.legend-footer-boundary {
+  margin-top: 7px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* ============================================================================
+   MAPA DE SITUAÇÃO INSET RETRÁTIL (CANTO INFERIOR ESQUERDO)
+   ============================================================================ */
+.inset-map-card {
+  position: fixed;
+  bottom: 36px;
+  left: 64px;
+  z-index: 590;
+  width: 205px;
+  background: var(--bg-glass-strong);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  box-shadow: var(--shadow-lg);
+  transition: all 0.2s ease;
+}
+
+.inset-map-card .widget-toggle-header h5 {
+  font-size: 10.5px;
+  line-height: 1.25;
+}
+
+.inset-map-card.collapsed {
+  width: 205px;
+}
+
+.inset-map-card.collapsed .inset-body {
+  display: none;
+}
+
+.inset-map-card.collapsed .widget-toggle-header {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+#insetCanvas {
+  width: 185px;
+  height: 150px;
+  background: #f8fafc;
+  border-radius: 6px;
+  display: block;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* ============================================================================
+   2. GAVETA LATERAL DESLIZANTE (MÁXIMO 400px / 30vw, SEM OVERLAY/BLUR NO MAPA)
+   ============================================================================ */
+.offcanvas-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 26px;
+  width: var(--drawer-width);
+  max-width: 400px;
+  min-width: 310px;
+  height: calc(100vh - 26px);
+  z-index: 700;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-active);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(102%);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.offcanvas-drawer.open {
+  transform: translateX(0);
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.drawer-header-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.drawer-kicker {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #38bdf8;
+  margin-bottom: 1px;
+}
+
+.drawer-header h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.btn-minimize-drawer {
+  background: rgba(14, 165, 233, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #7dd3fc;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-minimize-drawer:hover {
+  background: var(--accent-cyan);
+  color: #07101d;
+}
+
+.btn-close-clean {
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  padding: 5px 9px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-close-clean:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #fff;
+}
+
+/* Menus de Seleção Estilo Dropdown dentro da Gaveta Lateral */
+.drawer-selectors-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(15, 23, 42, 0.78);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.drawer-select-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drawer-select-group label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #38bdf8;
+}
+
+.drawer-dropdown {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  color-scheme: dark;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.drawer-dropdown option,
+.spatial-select option,
+.toolbar-select option {
+  background-color: #152036;
+  color: #f1f5f9;
+}
+
+.drawer-dropdown:hover {
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.drawer-dropdown.active-select {
+  background-color: var(--bg-card);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.35);
+}
+
+/* Componente Custom Dropdown com Transição Suave (Elimina o piscar nativo do Windows) */
+.cselect-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.cselect-native-hidden {
+  position: absolute !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
+.cselect-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 8px 11px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.cselect-trigger:hover {
+  background-color: var(--bg-card-hover);
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.cselect-wrap.active-select .cselect-trigger,
+.cselect-wrap.open .cselect-trigger {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.32);
+}
+
+.cselect-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cselect-arrow {
+  font-size: 10px;
+  color: #38bdf8;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+
+.cselect-wrap.open .cselect-arrow {
+  transform: rotate(180deg);
+}
+
+.cselect-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  z-index: 950;
+  background: #131e33;
+  border: 1px solid var(--border-active);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.68);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px) scale(0.985);
+  transform-origin: top center;
+  pointer-events: none;
+  transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 0.18s;
+}
+
+.cselect-wrap.open .cselect-menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.cselect-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.cselect-option:hover {
+  background: rgba(14, 165, 233, 0.18);
+  color: #fff;
+}
+
+.cselect-option.selected {
+  background: rgba(14, 165, 233, 0.24);
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.drawer-body::-webkit-scrollbar {
+  width: 6px;
+}
+.drawer-body::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 3px;
+}
+
+.tab-pane {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tab-pane.active {
+  display: flex;
+  animation: paneFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes paneFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Acordeões Colapsáveis dentro da Gaveta */
+details.collapsible-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+summary.collapsible-summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  cursor: pointer;
+  user-select: none;
+  background: rgba(15, 23, 42, 0.48);
+}
+
+summary.collapsible-summary::-webkit-details-marker {
+  display: none;
+}
+
+summary.collapsible-summary h3 {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.chevron-icon {
+  font-size: 11px;
+  color: var(--accent-cyan);
+  transition: transform 0.2s ease;
+}
+
+details.collapsible-card[open] .chevron-icon {
+  transform: rotate(180deg);
+}
+
+.collapsible-content {
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+p.answer-synthesis {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+p.answer-synthesis strong {
+  color: #7dd3fc;
+}
+
+.method-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* KPI Grid & Controles da Gaveta */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.kpi-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 9px 10px;
+}
+
+.kpi-label {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: 3px;
+}
+
+.kpi-value {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.kpi-sub {
+  font-size: 10px;
+  margin-top: 2px;
+  display: block;
+  color: var(--text-muted);
+}
+
+.pos-text { color: #34d399; }
+.neg-text { color: #f87171; }
+.warn-text { color: #fbbf24; }
+.info-text { color: #38bdf8; }
+
+.geoproc-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn-geoproc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  background: linear-gradient(135deg, #0284c7 0%, #0d9488 100%);
+  color: #fff;
+  transition: all 0.15s ease;
+}
+
+.btn-geoproc.active-toggle {
+  background: linear-gradient(135deg, #d97706 0%, #dc2626 100%);
+  border-color: #fbbf24;
+}
+
+.btn-secondary-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.btn-chip {
+  flex: 1;
+  min-width: 105px;
+  padding: 6px 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+}
+
+.btn-chip:hover {
+  background: var(--bg-card-hover);
+  color: #fff;
+}
+
+.btn-chip.active {
+  background: rgba(14, 165, 233, 0.22);
+  border-color: var(--accent-cyan);
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.select-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.spatial-select {
+  width: 100%;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  outline: none;
+}
+
+/* Calculadora Híbrida de Classes e Transição */
+.calc-dual-year-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.calc-year-col {
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  padding: 7px 7px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.calc-year-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7dd3fc;
+  padding: 0 2px 3px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.calc-mini-link {
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #bae6fd;
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.calc-mini-link:hover {
+  background: rgba(56, 189, 248, 0.28);
+  color: #fff;
+}
+
+.calc-class-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.calc-class-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5.5px 7px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.calc-class-name small {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.calc-class-toggle:hover {
+  background: rgba(30, 41, 59, 0.92);
+  color: #f8fafc;
+}
+
+.calc-class-toggle.active {
+  background: rgba(14, 165, 233, 0.14);
+  border-color: rgba(56, 189, 248, 0.65);
+  color: #f8fafc;
+}
+
+.calc-check-box {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(15, 23, 42, 0.85);
+  color: transparent;
+  font-size: 10.5px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.calc-class-toggle.active .calc-check-box {
+  background: #0ea5e9;
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.calc-class-name {
+  flex: 1;
+  line-height: 1.25;
+}
+
+.calc-direction-badge {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  text-align: center;
+}
+
+.calc-direction-badge.pos {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(52, 211, 153, 0.45);
+  color: #6ee7b7;
+}
+
+.calc-direction-badge.neg {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(248, 113, 113, 0.45);
+  color: #fca5a5;
+}
+
+.calc-direction-badge.same {
+  background: rgba(56, 189, 248, 0.14);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #7dd3fc;
+}
+
+/* ============================================================================
+   3. MODAIS CENTRALIZADOS PARA GRÁFICOS, TABELAS E PRANCHA CARTOGRÁFICA
+   ============================================================================ */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 10, 20, 0.84);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 2000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-backdrop.open {
+  display: flex;
+}
+
+.modal-window {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-active);
+  border-radius: var(--radius-lg);
+  max-width: 1180px;
+  width: 96%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 13px 18px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.modal-kicker {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #38bdf8;
+}
+
+.modal-title-group h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-tab-switcher {
+  display: flex;
+  background: var(--bg-secondary);
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  gap: 4px;
+}
+
+.btn-modal-tab {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-modal-tab:hover {
+  color: #fff;
+}
+
+.btn-modal-tab.active {
+  background: var(--accent-cyan);
+  color: #07101d;
+  font-weight: 700;
+}
+
+.modal-body {
+  padding: 18px;
+  overflow-y: auto;
+  background: #0b111e;
+  flex: 1;
+}
+
+.modal-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  display: block;
+  margin: 0 auto;
+}
+
+.modal-view-section {
+  display: none;
+}
+
+.modal-view-section.active {
+  display: block;
+}
+
+/* Grid de Gráficos dentro do Modal */
+.modal-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.modal-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-card-wide {
+  grid-column: 1 / -1;
+}
+
+.modal-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.modal-card-header h4 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.badge-subtle {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.chart-box-modal {
+  position: relative;
+  width: 100%;
+  height: 255px;
+}
+
+/* Tabelas dentro do Modal */
+.modal-tables-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-tables-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.data-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+table.spatial-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+table.spatial-table th {
+  background: rgba(15, 23, 42, 0.9);
+  color: var(--text-muted);
+  font-weight: 600;
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+table.spatial-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+  color: var(--text-secondary);
+}
+
+table.spatial-table tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+}
+
+table.spatial-table td.num,
+table.spatial-table th.num {
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+.table-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* ============================================================================
+   BARRA DE STATUS FLUTUANTE NO RODAPÉ (100% LARGURA)
+   ============================================================================ */
+.status-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  background: rgba(8, 13, 23, 0.92);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--border-subtle);
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  z-index: 620;
+}
+
+.footer-coords {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.footer-coords strong {
+  color: var(--text-secondary);
+}
+
+.footer-sep {
+  opacity: 0.4;
+}
+
+.footer-credits {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Rótulos da Grade UTM sobre o Mapa */
+.utm-grid-label {
+  background: rgba(15, 23, 42, 0.78);
+  color: #94a3b8;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  white-space: nowrap;
+}
+
+@media (max-width: 960px) {
+  .modal-charts-grid,
+  .modal-tables-two-col {
+    grid-template-columns: 1fr;
+  }
+  .footer-credits {
+    display: none;
+  }
+}
+
+/* Gráficos e tabelas exibidos dentro do painel descritivo (layout de coluna única) */
+.drawer-body .modal-charts-grid,
+.drawer-body .modal-tables-two-col { grid-template-columns: 1fr; gap: 12px; }
+.drawer-body .modal-tables-stack { gap: 12px; }
+.drawer-body .modal-card { padding: 10px 12px; gap: 8px; }
+.drawer-body .modal-card-header h4 { font-size: 12px; }
+.drawer-body .chart-box-modal { height: 230px; }
+.drawer-body table.spatial-table { font-size: 11px; }
+.drawer-body table.spatial-table th, .drawer-body table.spatial-table td { padding: 6px 7px; }
+.btn-shortcut-modal.active { background: var(--accent-cyan); color: #07101d; border-color: var(--accent-cyan); }
+
+/* Núcleo selecionado na tabela */
+#hotspotsTableBody tr.row-selected td { background: rgba(250, 204, 21, 0.16) !important; box-shadow: inset 3px 0 0 #facc15; }
+.hotspot-selected-label { background: #0f172a; color: #fde047; border: 1px solid #facc15; font-weight: 700; font-size: 12px; font-family: var(--font-mono); }
+.hotspot-selected-label::before { border-top-color: #facc15 !important; }
